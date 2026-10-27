@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Alert, AlertDescription, Button, Input } from "@/components/ui";
+import { formatDate, formatMoney, formatTime, getDateKey } from "@/lib/clipper/format";
 import { cn } from "@/lib/utils";
 
 type PackageOption = {
@@ -42,18 +43,6 @@ type SlotOption = {
   groomerName?: string;
 };
 
-function formatMoney(cents: number) {
-  return `₩${cents.toLocaleString("ko-KR")}`;
-}
-
-function formatDateLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" }).format(date);
-}
-
-function formatTimeLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
-}
-
 function normalizeSlot(slot: ApiSlot, index: number): SlotOption | null {
   const startsAt = slot.startsAt ?? (slot.date && slot.time ? `${slot.date}T${slot.time}` : undefined);
   if (!startsAt) return null;
@@ -63,9 +52,9 @@ function normalizeSlot(slot: ApiSlot, index: number): SlotOption | null {
     id: slot.id ?? `slot-${index}-${date.toISOString()}`,
     startsAt: String(startsAt),
     endsAt: slot.endsAt,
-    dateKey: date.toISOString().slice(0, 10),
-    dateLabel: formatDateLabel(date),
-    timeLabel: slot.label ?? formatTimeLabel(date),
+    dateKey: getDateKey(date) ?? date.toISOString().slice(0, 10),
+    dateLabel: formatDate(date) ?? "",
+    timeLabel: formatTime(date) ?? "",
     groomerName: slot.groomerName,
   };
 }
@@ -90,10 +79,10 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
     ],
     neighborhoods: ["Hannam-dong", "Yeonnam-dong", "Seongsu-dong", "Itaewon", "Gangnam", "Mangwon-dong"],
     availableSlots: [
-      { id: "fallback-fri-10", startsAt: "2026-08-21T10:00:00Z", label: "10:00 AM" },
-      { id: "fallback-fri-13", startsAt: "2026-08-21T13:00:00Z", label: "1:00 PM" },
-      { id: "fallback-sat-11", startsAt: "2026-08-22T11:00:00Z", label: "11:00 AM" },
-      { id: "fallback-sat-14", startsAt: "2026-08-22T14:00:00Z", label: "2:00 PM" },
+      { id: "fallback-fri-10", startsAt: "2026-08-21T10:00:00Z" },
+      { id: "fallback-fri-13", startsAt: "2026-08-21T13:00:00Z" },
+      { id: "fallback-sat-11", startsAt: "2026-08-22T11:00:00Z" },
+      { id: "fallback-sat-14", startsAt: "2026-08-22T14:00:00Z" },
     ],
   };
 

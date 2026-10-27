@@ -11,6 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { formatDate, formatMoney, formatTime } from "@/lib/clipper/format";
 import type { AppointmentDetails } from "@/lib/clipper/types";
 
 type AppointmentCardProps = {
@@ -63,46 +64,9 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   },
 };
 
-const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const months = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-function asDate(value: Date | number | string | null | undefined) {
-  if (!value) return null;
-  return value instanceof Date ? value : new Date(value);
-}
-
-function formatDate(value: Date | number | string | null | undefined) {
-  const date = asDate(value);
-  if (!date || Number.isNaN(date.getTime())) return "Date to be confirmed";
-  return `${weekdays[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-}
-
-function formatTime(value: Date | number | string | null | undefined) {
-  const date = asDate(value);
-  if (!date || Number.isNaN(date.getTime())) return "Time to be confirmed";
-  const hour = date.getHours();
-  const minute = date.getMinutes().toString().padStart(2, "0");
-  const meridiem = hour >= 12 ? "PM" : "AM";
-  const twelveHour = hour % 12 || 12;
-  return `${twelveHour}:${minute} ${meridiem}`;
-}
-
 function formatPrice(priceCents: number | null | undefined) {
   if (typeof priceCents !== "number") return "Price to be confirmed";
-  return `₩${priceCents.toLocaleString("ko-KR")}`;
+  return formatMoney(priceCents);
 }
 
 export function AppointmentCard({ appointment }: AppointmentCardProps) {
@@ -112,9 +76,9 @@ export function AppointmentCard({ appointment }: AppointmentCardProps) {
     label: details.status ?? "Booked",
     className: "border-(--bd-cbd8ff) bg-(--bg-eef1ff) text-(--fg-4353a3)",
   };
-  const appointmentDate = formatDate(details.startsAt);
-  const startTime = formatTime(details.startsAt);
-  const endTime = formatTime(details.endsAt);
+  const appointmentDate = formatDate(details.startsAt, "long") ?? "Date to be confirmed";
+  const startTime = formatTime(details.startsAt) ?? "Time to be confirmed";
+  const endTime = formatTime(details.endsAt) ?? "Time to be confirmed";
   const address = details.address ?? "Address to be confirmed";
   const neighborhood = details.neighborhood ? `, ${details.neighborhood}` : "";
   const petName = details.pet?.name ?? "Your pet";
