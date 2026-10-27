@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowUpRight, Phone } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AppointmentActions } from "@/components/clipper/appointment-actions";
 import { AppointmentCard } from "@/components/clipper/appointment-card";
 import { BookingConfirmation } from "@/components/clipper/booking-confirmation";
 import { ThemeToggle } from "@/components/clipper/theme-toggle";
@@ -20,6 +21,10 @@ export default async function AppointmentPage({ params }: AppointmentPageProps) 
   if (!appointment) {
     notFound();
   }
+
+  const canChange =
+    (appointment.status === "confirmed" || appointment.status === "pending") &&
+    new Date(appointment.startsAt).getTime() > Date.now();
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-(--bg-f7f9fc) text-(--fg-0a2540)">
@@ -45,10 +50,14 @@ export default async function AppointmentPage({ params }: AppointmentPageProps) 
             <AppointmentCard appointment={appointment} />
           </div>
 
+          <div className="mt-8 empty:hidden">
+            <AppointmentActions reference={appointment.reference} canChange={canChange} />
+          </div>
+
           <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-5 py-5 text-sm text-(--fg-53627a) sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <div>
               <p className="font-semibold text-(--fg-0a2540)">Need to change something?</p>
-              <p className="mt-1">Give our tiny team a call and we&apos;ll take care of it.</p>
+              <p className="mt-1">{canChange ? "Prefer to talk it through? Give our tiny team a call." : "Give our tiny team a call and we’ll take care of it."}</p>
             </div>
             <a href="tel:+8225550142" className="inline-flex items-center gap-2 font-bold text-(--fg-635bff) hover:text-(--fg-0a2540)">
               <Phone aria-hidden="true" className="size-4" /> 02-555-0142
