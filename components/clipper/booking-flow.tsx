@@ -81,7 +81,7 @@ function mergeOptions(current: BookingOptionsResponse, incoming: Partial<Booking
   };
 }
 
-export function BookingFlow({ sectionId = "book", variant = "prism", theme = { ink: "var(--fg-0a2540)", accent: "#635bff" } }: { sectionId?: string; variant?: "prism"; theme?: { ink: string; accent: string } }) {
+export function BookingFlow({ sectionId = "book", variant = "prism", theme = { ink: "var(--fg-0a2540)", accent: "var(--bg-635bff)" } }: { sectionId?: string; variant?: "prism"; theme?: { ink: string; accent: string } }) {
   const fallbackOptions: BookingOptionsResponse = {
     packages: [
       { id: "pkg_bath_brush", name: "Bath & Brush", description: "A refreshing bath, blow dry, brush-out, and nail trim.", durationMinutes: 60, priceCents: 65000 },
@@ -174,23 +174,22 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
       });
   }
 
-  const prism = true;
   const ink = theme.ink;
   const accent = theme.accent;
 
   return (
       <section id={sectionId} className={cn("clipper-booking scroll-mt-5", `clipper-booking--${variant}`)}>
         <div className="mx-auto max-w-7xl px-5 pb-24 sm:px-8 lg:px-12">
-          <div className={cn("mb-10 max-w-3xl", prism ? "pt-2" : "pt-4")}>
-            <p className="text-sm font-bold" style={{ color: "var(--fg-635bff)" }}>{prism ? "Book a Clipper visit" : "Create an appointment"}</p>
+          <div className="mb-10 max-w-3xl pt-2">
+            <p className="text-sm font-bold" style={{ color: "var(--fg-635bff)" }}>Book a Clipper visit</p>
             <h2 className="mt-3 text-[clamp(2.7rem,6vw,5.25rem)] font-bold leading-[0.95] tracking-[-0.06em]" style={{ color: ink }}>
-              {prism ? "Everything your pet needs. One calm visit." : "Build the right grooming visit."}
+              Everything your pet needs. One calm visit.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-(--fg-53627a)">Choose the pet, service, location, and time. We’ll match the route with a trusted Seoul groomer.</p>
           </div>
 
-          <div className={cn("overflow-hidden border bg-(--bg-ffffff)", prism ? "rounded-2xl border-(--bd-dbe3ef) shadow-[0_32px_90px_rgb(38_46_77/12%)]" : "rounded-xl border-(--bd-eadbd6) shadow-[0_32px_90px_rgb(66_35_45/10%)] lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]")}>
-            <div className={cn("grid", prism ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : "lg:grid-cols-[minmax(0,1fr)_19rem]")}>
+          <div className="overflow-hidden rounded-2xl border border-(--bd-dbe3ef) bg-(--bg-ffffff) shadow-[0_32px_90px_rgb(38_46_77/12%)]">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="space-y-10 p-5 sm:p-8 lg:p-10">
                 {formError && <Alert className="border-(--bd-f3aaa0) bg-(--bg-fff3f0) text-(--fg-8f3d30)"><AlertDescription>{formError}</AlertDescription></Alert>}
                 {loadingOptions && <p className="text-xs font-semibold text-(--fg-8898aa)">Checking this week’s available routes…</p>}
@@ -218,7 +217,7 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
                 </fieldset>
               </div>
 
-              <aside className={cn("border-t p-5 sm:p-7 lg:border-l lg:border-t-0", prism ? "border-(--bd-e6ebf1) bg-(--bg-f7f9fc)" : "border-(--bd-eadbd6) bg-(--bg-fff8f4)")}>
+              <aside className="border-t border-(--bd-e6ebf1) bg-(--bg-f7f9fc) p-5 sm:p-7 lg:border-l lg:border-t-0">
                 <div className="lg:sticky lg:top-6">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--fg-8898aa)">Visit summary</p>
                   <p className="mt-5 text-2xl font-bold tracking-[-0.04em]" style={{ color: ink }}>{petName || "Your pet"}</p>
