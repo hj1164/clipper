@@ -70,16 +70,7 @@ function normalizeSlot(slot: ApiSlot, index: number): SlotOption | null {
   };
 }
 
-function mergeOptions(current: BookingOptionsResponse, incoming: Partial<BookingOptionsResponse>): BookingOptionsResponse {
-  return {
-    ...current,
-    ...incoming,
-    packages: incoming.packages?.length ? incoming.packages : current.packages,
-    neighborhoods: incoming.neighborhoods?.length ? incoming.neighborhoods : current.neighborhoods,
-    availableSlots: incoming.availableSlots?.length ? incoming.availableSlots : current.availableSlots,
-    slots: incoming.slots?.length ? incoming.slots : current.slots,
-  };
-}
+const SUPPORT_PHONE = "02-555-0142";
 
 export function BookingFlow({ sectionId = "book", variant = "prism", theme = { ink: "var(--fg-0a2540)", accent: "#635bff" } }: { sectionId?: string; variant?: "prism"; theme?: { ink: string; accent: string } }) {
   const fallbackOptions: BookingOptionsResponse = {
@@ -109,6 +100,7 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   const selectedPackage = options.packages.find((pkg) => pkg.id === selectedPackageId);
   const neighborhoods = options.neighborhoods.map((neighborhood) => typeof neighborhood === "string" ? neighborhood : neighborhood.name);
@@ -129,12 +121,20 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
       })
       .then((data) => {
         if (cancelled) return;
-        setOptions((current) => mergeOptions(current, data));
+        setLoadError(false);
+        setOptions((current) => ({
+          ...current,
+          packages: data.packages ?? [],
+          neighborhoods: data.neighborhoods ?? [],
+          availableSlots: data.availableSlots ?? current.availableSlots,
+          slots: data.slots ?? current.slots,
+        }));
         const firstSlot = data.availableSlots?.[0] ?? data.slots?.[0] ?? options.availableSlots?.[0] ?? options.slots?.[0];
         setSelectedSlotId(firstSlot?.id ?? "");
       })
       .catch(() => {
-        // Keep the local booking options available when the API is offline.
+        // Keep the local booking options available when the API is offline, but say so.
+        if (!cancelled) setLoadError(true);
       })
       .finally(() => {
         if (!cancelled) setLoadingOptions(false);
@@ -194,6 +194,7 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
               <div className="space-y-10 p-5 sm:p-8 lg:p-10">
                 {formError && <Alert className="border-(--bd-f3aaa0) bg-(--bg-fff3f0) text-(--fg-8f3d30)"><AlertDescription>{formError}</AlertDescription></Alert>}
                 {loadingOptions && <p className="text-xs font-semibold text-(--fg-8898aa)">Checking this week’s available routes…</p>}
+                {loadError && !loadingOptions && <Alert className="border-(--bd-f3aaa0) bg-(--bg-fff3f0) text-(--fg-8f3d30)"><AlertDescription>We couldn’t load live availability, so these options are samples and may not be bookable. Refresh to try again, or call {SUPPORT_PHONE}.</AlertDescription></Alert>}
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>1. Who are we grooming?</legend>
@@ -202,19 +203,21 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>2. Choose a service</legend>
+                  {!options.packages.length && !loadingOptions && <p className="border-y border-(--bd-e6ebf1) py-5 text-sm text-(--fg-53627a)">No services are open for booking right now. Please call {SUPPORT_PHONE} and we’ll find a time for you.</p>}
                   <div className="divide-y divide-(--bd-e6ebf1) border-y border-(--bd-e6ebf1)">{options.packages.map((pkg) => <button type="button" key={pkg.id} onClick={() => { setSelectedPackageId(pkg.id); setFormError(""); }} className={cn("grid w-full grid-cols-[1fr_auto] items-center gap-5 px-1 py-5 text-left", selectedPackageId === pkg.id ? "" : "opacity-70 hover:opacity-100")}><span><span className="flex items-center gap-2 font-bold" style={{ color: ink }}><span className="size-2 rounded-full" style={{ background: selectedPackageId === pkg.id ? accent : "var(--bd-dbe3ef)" }} />{pkg.name}</span><span className="mt-1 block pl-4 text-xs leading-5 text-(--fg-8898aa)">{pkg.description}</span></span><span className="text-right"><span className="block font-bold" style={{ color: ink }}>{formatMoney(pkg.priceCents)}</span><span className="text-xs text-(--fg-8898aa)">{pkg.durationMinutes} min</span></span></button>)}</div>
                 </fieldset>
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>3. Where should we arrive?</legend>
-                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><Input aria-label="Street address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street address" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><select aria-label="Neighborhood" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)} className="h-12 rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select></div>
+                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><Input aria-label="Street address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street address" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><select aria-label="Neighborhood" disabled={!neighborhoods.length} value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)} className="h-12 rounded-md disabled:opacity-60 border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select></div>
+                  {!neighborhoods.length && !loadingOptions && <p className="mt-3 text-sm text-(--fg-53627a)">We aren’t serving any neighborhoods yet. Please call {SUPPORT_PHONE} to check coverage for your address.</p>}
                   <Input placeholder="Apartment, floor, or gate code (optional)" className="mt-3 h-11 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4" />
                 </fieldset>
 
                 <fieldset>
                   <legend className="mb-1 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>4. Pick an arrival time</legend>
                   <p className="mb-4 text-xs text-(--fg-8898aa)">All times KST · matched against live groomer routes</p>
-                  <div className="grid gap-5 sm:grid-cols-2">{Object.entries(groupedSlots).map(([dateKey, dateSlots]) => <div key={dateKey}><p className="mb-2 text-sm font-bold" style={{ color: ink }}>{dateSlots[0]?.dateLabel}</p><div className="grid grid-cols-2 gap-2">{dateSlots.map((slot) => <button type="button" key={slot.id} onClick={() => { setSelectedSlotId(slot.id); setFormError(""); }} className={cn("rounded-md border px-3 py-3 text-sm font-bold", selectedSlotId === slot.id ? "text-white" : "border-(--bd-dbe3ef) bg-(--bg-ffffff) text-(--fg-425466)")} style={selectedSlotId === slot.id ? { background: accent, borderColor: accent } : undefined}>{slot.timeLabel}</button>)}</div></div>)}{!slots.length && <p className="text-sm text-(--fg-53627a)">No routes are open for this address yet.</p>}</div>
+                  <div className="grid gap-5 sm:grid-cols-2">{Object.entries(groupedSlots).map(([dateKey, dateSlots]) => <div key={dateKey}><p className="mb-2 text-sm font-bold" style={{ color: ink }}>{dateSlots[0]?.dateLabel}</p><div className="grid grid-cols-2 gap-2">{dateSlots.map((slot) => <button type="button" key={slot.id} onClick={() => { setSelectedSlotId(slot.id); setFormError(""); }} className={cn("rounded-md border px-3 py-3 text-sm font-bold", selectedSlotId === slot.id ? "text-white" : "border-(--bd-dbe3ef) bg-(--bg-ffffff) text-(--fg-425466)")} style={selectedSlotId === slot.id ? { background: accent, borderColor: accent } : undefined}>{slot.timeLabel}</button>)}</div></div>)}{!slots.length && !loadingOptions && <p className="text-sm text-(--fg-53627a)">No routes are open for this address yet. Call {SUPPORT_PHONE} and we’ll find a time for you.</p>}</div>
                 </fieldset>
               </div>
 
@@ -223,9 +226,9 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--fg-8898aa)">Visit summary</p>
                   <p className="mt-5 text-2xl font-bold tracking-[-0.04em]" style={{ color: ink }}>{petName || "Your pet"}</p>
                   <p className="mt-1 text-sm text-(--fg-53627a)">{selectedPackage?.name ?? "Choose a service"}</p>
-                  <dl className="mt-7 space-y-4 border-y border-(--bd-dbe3ef) py-5 text-sm"><div className="flex justify-between gap-3"><dt className="text-(--fg-8898aa)">Arrival</dt><dd className="text-right font-semibold" style={{ color: ink }}>{selectedSlot ? `${selectedSlot.dateLabel}, ${selectedSlot.timeLabel}` : "Not selected"}</dd></div><div className="flex justify-between"><dt className="text-(--fg-8898aa)">Duration</dt><dd className="font-semibold" style={{ color: ink }}>{durationMinutes} min</dd></div><div className="flex justify-between"><dt className="text-(--fg-8898aa)">Neighborhood</dt><dd className="font-semibold" style={{ color: ink }}>{selectedNeighborhood || "Not selected"}</dd></div></dl>
-                  <div className="my-6 flex items-end justify-between"><span className="text-sm font-semibold text-(--fg-53627a)">Total</span><span className="text-3xl font-bold tracking-[-0.05em]" style={{ color: ink }}>{formatMoney(totalPrice)}</span></div>
-                  <Button type="button" onClick={validateAndSubmit} disabled={submitting || loadingOptions} className="h-12 w-full rounded-md text-sm font-bold !text-white shadow-none" style={{ background: accent }}>{submitting ? "Saving your spot…" : "Confirm visit →"}</Button>
+                  <dl className="mt-7 space-y-4 border-y border-(--bd-dbe3ef) py-5 text-sm"><div className="flex justify-between gap-3"><dt className="text-(--fg-8898aa)">Arrival</dt><dd className="text-right font-semibold" style={{ color: ink }}>{selectedSlot ? `${selectedSlot.dateLabel}, ${selectedSlot.timeLabel}` : "Not selected"}</dd></div><div className="flex justify-between"><dt className="text-(--fg-8898aa)">Duration</dt><dd className="font-semibold" style={{ color: ink }}>{selectedPackage ? `${durationMinutes} min` : "—"}</dd></div><div className="flex justify-between"><dt className="text-(--fg-8898aa)">Neighborhood</dt><dd className="font-semibold" style={{ color: ink }}>{selectedNeighborhood || "Not selected"}</dd></div></dl>
+                  <div className="my-6 flex items-end justify-between"><span className="text-sm font-semibold text-(--fg-53627a)">Total</span><span className="text-3xl font-bold tracking-[-0.05em]" style={{ color: ink }}>{selectedPackage ? formatMoney(totalPrice) : "—"}</span></div>
+                  <Button type="button" onClick={validateAndSubmit} disabled={submitting || loadingOptions || !options.packages.length || !neighborhoods.length} className="h-12 w-full rounded-md text-sm font-bold !text-white shadow-none" style={{ background: accent }}>{submitting ? "Saving your spot…" : "Confirm visit →"}</Button>
                   <p className="mt-3 text-center text-[0.68rem] leading-5 text-(--fg-8898aa)">No charge until your groomer is confirmed.</p>
                 </div>
               </aside>
