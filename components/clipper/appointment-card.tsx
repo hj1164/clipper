@@ -21,6 +21,7 @@ type DetailsForDisplay = {
   reference?: string | null;
   bookingReference?: string;
   address?: string | null;
+  unit?: string | null;
   neighborhood?: string | null;
   startsAt?: Date | number | string | null;
   endsAt?: Date | number | string | null;
@@ -116,6 +117,7 @@ export function AppointmentCard({ appointment }: AppointmentCardProps) {
   const startTime = formatTime(details.startsAt);
   const endTime = formatTime(details.endsAt);
   const address = details.address ?? "Address to be confirmed";
+  const unit = details.unit ? `, ${details.unit}` : "";
   const neighborhood = details.neighborhood ? `, ${details.neighborhood}` : "";
   const petName = details.pet?.name ?? "Your pet";
 
@@ -144,7 +146,7 @@ export function AppointmentCard({ appointment }: AppointmentCardProps) {
           </DetailRow>
           <DetailRow icon={<MapPin aria-hidden="true" />} label="Where">
             <strong className="block font-semibold text-(--fg-0a2540)">At your home</strong>
-            <span>{address}{neighborhood}</span>
+            <span>{address}{unit}{neighborhood}</span>
           </DetailRow>
           <DetailRow icon={<Clock3 aria-hidden="true" />} label="Visit length">
             <strong className="block font-semibold text-(--fg-0a2540)">{service?.durationMinutes ?? "—"} minutes</strong>

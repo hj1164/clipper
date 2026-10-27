@@ -21,6 +21,7 @@ type BookingRequest = {
   packageId?: unknown;
   neighborhood?: unknown;
   address?: unknown;
+  unit?: unknown;
   startsAt?: unknown;
 };
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
   const packageId = input.packageId as string;
   const neighborhood = input.neighborhood as string;
   const address = input.address as string;
+  const unit = typeof input.unit === "string" ? input.unit.trim() : "";
   const startsAt = new Date(input.startsAt as string);
 
   if (Number.isNaN(startsAt.getTime())) {
@@ -115,10 +117,10 @@ export async function POST(request: Request) {
   const result = await env.DB.prepare(
     `INSERT INTO appointments (
        id, booking_reference, pet_name, pet_breed, groomer_id, package_id,
-       address, neighborhood, starts_at, ends_at, status, price_cents,
+       address, neighborhood, unit, starts_at, ends_at, status, price_cents,
        notes, created_at, updated_at
      )
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, NULL, ?, ?
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, NULL, ?, ?
      WHERE NOT EXISTS (
        SELECT 1 FROM appointments
        WHERE groomer_id = ?
@@ -136,6 +138,7 @@ export async function POST(request: Request) {
       packageId,
       address.trim(),
       neighborhood.trim(),
+      unit || null,
       startsAt.getTime(),
       endsAt.getTime(),
       groomingPackage.priceCents,
