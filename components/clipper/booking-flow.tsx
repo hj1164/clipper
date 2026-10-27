@@ -54,6 +54,16 @@ function formatTimeLabel(date: Date) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+const seoulDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" });
+
+// /api/booking-options returns no slots yet, so offer sample slots on the next two Seoul days.
+function buildFallbackSlots(): ApiSlot[] {
+  return [1, 2].flatMap((daysAhead) => {
+    const day = seoulDay.format(new Date(Date.now() + daysAhead * 86400000));
+    return ["10:00", "14:00"].map((time) => ({ id: `fallback-${day}-${time}`, startsAt: `${day}T${time}:00+09:00` }));
+  });
+}
+
 function normalizeSlot(slot: ApiSlot, index: number): SlotOption | null {
   const startsAt = slot.startsAt ?? (slot.date && slot.time ? `${slot.date}T${slot.time}` : undefined);
   if (!startsAt) return null;
@@ -89,23 +99,18 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
       { id: "pkg_deluxe", name: "Deluxe Spa", description: "Full grooming plus teeth brushing and a soothing paw treatment.", durationMinutes: 120, priceCents: 135000 },
     ],
     neighborhoods: ["Hannam-dong", "Yeonnam-dong", "Seongsu-dong", "Itaewon", "Gangnam", "Mangwon-dong"],
-    availableSlots: [
-      { id: "fallback-fri-10", startsAt: "2026-08-21T10:00:00Z", label: "10:00 AM" },
-      { id: "fallback-fri-13", startsAt: "2026-08-21T13:00:00Z", label: "1:00 PM" },
-      { id: "fallback-sat-11", startsAt: "2026-08-22T11:00:00Z", label: "11:00 AM" },
-      { id: "fallback-sat-14", startsAt: "2026-08-22T14:00:00Z", label: "2:00 PM" },
-    ],
+    availableSlots: buildFallbackSlots(),
   };
 
   const [options, setOptions] = useState<BookingOptionsResponse>(fallbackOptions);
-  const [petName, setPetName] = useState("Luna");
-  const [petBreed, setPetBreed] = useState("Miniature Poodle");
-  const [selectedPackageId, setSelectedPackageId] = useState("pkg_full_groom");
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState("Itaewon");
-  const [address, setAddress] = useState("42 Itaewon-ro 27ga-gil");
-  const [selectedSlotId, setSelectedSlotId] = useState("fallback-fri-10");
-  const [totalPrice, setTotalPrice] = useState(95000);
-  const [durationMinutes, setDurationMinutes] = useState(90);
+  const [petName, setPetName] = useState("");
+  const [petBreed, setPetBreed] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState("");
+  const [address, setAddress] = useState("");
+  const [selectedSlotId, setSelectedSlotId] = useState("");
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [durationMinutes, setDurationMinutes] = useState(0);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -130,8 +135,6 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
       .then((data) => {
         if (cancelled) return;
         setOptions((current) => mergeOptions(current, data));
-        const firstSlot = data.availableSlots?.[0] ?? data.slots?.[0] ?? options.availableSlots?.[0] ?? options.slots?.[0];
-        setSelectedSlotId(firstSlot?.id ?? "");
       })
       .catch(() => {
         // Keep the local booking options available when the API is offline.
@@ -207,7 +210,7 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>3. Where should we arrive?</legend>
-                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><Input aria-label="Street address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street address" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><select aria-label="Neighborhood" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)} className="h-12 rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select></div>
+                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><Input aria-label="Street address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="e.g. 42 Itaewon-ro 27ga-gil" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><select aria-label="Neighborhood" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)} className="h-12 rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select></div>
                   <Input placeholder="Apartment, floor, or gate code (optional)" className="mt-3 h-11 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4" />
                 </fieldset>
 
