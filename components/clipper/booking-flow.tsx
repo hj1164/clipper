@@ -42,6 +42,16 @@ type SlotOption = {
   groomerName?: string;
 };
 
+class BookingError extends Error {}
+
+const FIELD_ORDER = ["petName", "petBreed", "package", "neighborhood", "address", "slot"] as const;
+type FieldKey = (typeof FIELD_ORDER)[number];
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return <p id={id} className="mt-1.5 text-xs font-semibold text-(--fg-8f3d30)">{message}</p>;
+}
+
 function formatMoney(cents: number) {
   return `₩${cents.toLocaleString("ko-KR")}`;
 }
@@ -109,6 +119,15 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+
+  function clearError(field: FieldKey) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const { [field]: _removed, ...rest } = current;
+      return rest;
+    });
+  }
 
   const selectedPackage = options.packages.find((pkg) => pkg.id === selectedPackageId);
   const neighborhoods = options.neighborhoods.map((neighborhood) => typeof neighborhood === "string" ? neighborhood : neighborhood.name);
@@ -148,8 +167,18 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
   }, [selectedPackage]);
 
   function validateAndSubmit() {
-    if (!petName.trim() || !petBreed || !selectedPackageId || !selectedNeighborhood || !address || !selectedSlot) {
-      setFormError("Please complete each step before booking your Clipper visit.");
+    const errors: Partial<Record<FieldKey, string>> = {};
+    if (!petName.trim()) errors.petName = "Enter your pet’s name.";
+    if (!petBreed) errors.petBreed = "Choose a breed.";
+    if (!selectedPackageId) errors.package = "Choose a service.";
+    if (!selectedNeighborhood) errors.neighborhood = "Choose a neighborhood.";
+    if (!address.trim()) errors.address = "Enter the street address.";
+    if (!selectedSlot) errors.slot = "Pick an arrival time.";
+    setFieldErrors(errors);
+    const firstInvalid = FIELD_ORDER.find((field) => errors[field]);
+    if (firstInvalid || !selectedSlot) {
+      setFormError("Please fix the highlighted fields before booking your Clipper visit.");
+      if (firstInvalid) document.getElementById(`field-${firstInvalid}`)?.focus();
       return;
     }
     setSubmitting(true);
@@ -157,20 +186,25 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
     fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ petName: petName.trim(), petBreed, packageId: selectedPackageId, neighborhood: selectedNeighborhood, address, startsAt: selectedSlot.startsAt, endsAt: selectedSlot.endsAt, priceCents: totalPrice, durationMinutes }),
+      body: JSON.stringify({ petName: petName.trim(), petBreed, packageId: selectedPackageId, neighborhood: selectedNeighborhood, address: address.trim(), startsAt: selectedSlot.startsAt, endsAt: selectedSlot.endsAt, priceCents: totalPrice, durationMinutes }),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error("Could not create booking");
-        return response.json() as Promise<{ reference?: string; bookingReference?: string }>;
-      })
-      .then((data) => {
-        const reference = data.reference ?? data.bookingReference;
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as { reference?: string; bookingReference?: string; error?: string } | null;
+        if (!response.ok) {
+          if (response.status === 409) {
+            setSelectedSlotId("");
+            setFieldErrors({ slot: "That time is no longer available. Please pick another." });
+            document.getElementById("field-slot")?.focus();
+          }
+          throw new BookingError(body?.error ?? "Could not create booking");
+        }
+        const reference = body?.reference ?? body?.bookingReference;
         if (!reference) throw new Error("Booking reference missing");
         window.location.assign(`/appointments/${encodeURIComponent(reference)}`);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         setSubmitting(false);
-        setFormError("We couldn’t save that visit. Please check your details and try again.");
+        setFormError(error instanceof BookingError ? error.message : "We couldn’t save that visit. Please check your details and try again.");
       });
   }
 
@@ -197,24 +231,24 @@ export function BookingFlow({ sectionId = "book", variant = "prism", theme = { i
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>1. Who are we grooming?</legend>
-                  <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-(--fg-53627a)">Pet name<Input aria-label="Pet name" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="e.g. Luna" className="mt-2 h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base font-normal text-(--fg-0a2540) focus-visible:ring-(--bd-635bff)" /></label><label className="text-xs font-bold text-(--fg-53627a)">Breed<select aria-label="Breed" value={petBreed} onChange={(event) => setPetBreed(event.target.value)} className="mt-2 h-12 w-full rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base font-normal text-(--fg-0a2540) outline-none focus:border-(--bd-635bff)"><option value="">Choose a breed</option><option>Chihuahua</option><option>Golden Retriever</option><option>Labrador Retriever</option><option>French Bulldog</option><option>German Shepherd</option><option>Pitbull</option><option>Poodle</option><option>Miniature Poodle</option><option>Pomeranian</option><option>Shiba Inu</option><option>Welsh Corgi</option><option>Yorkshire Terrier</option><option>Mixed Breed</option></select></label></div>
+                  <div className="grid gap-3 sm:grid-cols-2"><div><label className="text-xs font-bold text-(--fg-53627a)">Pet name<Input id="field-petName" aria-label="Pet name" aria-invalid={Boolean(fieldErrors.petName)} aria-describedby={fieldErrors.petName ? "error-petName" : undefined} value={petName} onChange={(event) => { setPetName(event.target.value); clearError("petName"); }} placeholder="e.g. Luna" className="mt-2 h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base font-normal text-(--fg-0a2540) focus-visible:ring-(--bd-635bff)" /></label><FieldError id="error-petName" message={fieldErrors.petName} /></div><div><label className="text-xs font-bold text-(--fg-53627a)">Breed<select id="field-petBreed" aria-label="Breed" aria-invalid={Boolean(fieldErrors.petBreed)} aria-describedby={fieldErrors.petBreed ? "error-petBreed" : undefined} value={petBreed} onChange={(event) => { setPetBreed(event.target.value); clearError("petBreed"); }} className="mt-2 h-12 w-full rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base font-normal text-(--fg-0a2540) outline-none focus:border-(--bd-635bff)"><option value="">Choose a breed</option><option>Chihuahua</option><option>Golden Retriever</option><option>Labrador Retriever</option><option>French Bulldog</option><option>German Shepherd</option><option>Pitbull</option><option>Poodle</option><option>Miniature Poodle</option><option>Pomeranian</option><option>Shiba Inu</option><option>Welsh Corgi</option><option>Yorkshire Terrier</option><option>Mixed Breed</option></select></label><FieldError id="error-petBreed" message={fieldErrors.petBreed} /></div></div>
                 </fieldset>
 
-                <fieldset>
+                <fieldset id="field-package" tabIndex={-1} className="outline-none">
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>2. Choose a service</legend>
-                  <div className="divide-y divide-(--bd-e6ebf1) border-y border-(--bd-e6ebf1)">{options.packages.map((pkg) => <button type="button" key={pkg.id} onClick={() => { setSelectedPackageId(pkg.id); setFormError(""); }} className={cn("grid w-full grid-cols-[1fr_auto] items-center gap-5 px-1 py-5 text-left", selectedPackageId === pkg.id ? "" : "opacity-70 hover:opacity-100")}><span><span className="flex items-center gap-2 font-bold" style={{ color: ink }}><span className="size-2 rounded-full" style={{ background: selectedPackageId === pkg.id ? accent : "var(--bd-dbe3ef)" }} />{pkg.name}</span><span className="mt-1 block pl-4 text-xs leading-5 text-(--fg-8898aa)">{pkg.description}</span></span><span className="text-right"><span className="block font-bold" style={{ color: ink }}>{formatMoney(pkg.priceCents)}</span><span className="text-xs text-(--fg-8898aa)">{pkg.durationMinutes} min</span></span></button>)}</div>
+                  <div className="divide-y divide-(--bd-e6ebf1) border-y border-(--bd-e6ebf1)">{options.packages.map((pkg) => <button type="button" key={pkg.id} onClick={() => { setSelectedPackageId(pkg.id); setFormError(""); clearError("package"); }} className={cn("grid w-full grid-cols-[1fr_auto] items-center gap-5 px-1 py-5 text-left", selectedPackageId === pkg.id ? "" : "opacity-70 hover:opacity-100")}><span><span className="flex items-center gap-2 font-bold" style={{ color: ink }}><span className="size-2 rounded-full" style={{ background: selectedPackageId === pkg.id ? accent : "var(--bd-dbe3ef)" }} />{pkg.name}</span><span className="mt-1 block pl-4 text-xs leading-5 text-(--fg-8898aa)">{pkg.description}</span></span><span className="text-right"><span className="block font-bold" style={{ color: ink }}>{formatMoney(pkg.priceCents)}</span><span className="text-xs text-(--fg-8898aa)">{pkg.durationMinutes} min</span></span></button>)}</div><FieldError id="error-package" message={fieldErrors.package} />
                 </fieldset>
 
                 <fieldset>
                   <legend className="mb-4 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>3. Where should we arrive?</legend>
-                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><Input aria-label="Street address" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street address" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><select aria-label="Neighborhood" value={selectedNeighborhood} onChange={(event) => setSelectedNeighborhood(event.target.value)} className="h-12 rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select></div>
+                  <div className="grid gap-3 sm:grid-cols-[1.25fr_0.75fr]"><div><Input id="field-address" aria-label="Street address" aria-invalid={Boolean(fieldErrors.address)} aria-describedby={fieldErrors.address ? "error-address" : undefined} value={address} onChange={(event) => { setAddress(event.target.value); clearError("address"); }} placeholder="Street address" className="h-12 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 focus-visible:ring-(--bd-705cf6)" /><FieldError id="error-address" message={fieldErrors.address} /></div><div><select id="field-neighborhood" aria-label="Neighborhood" aria-invalid={Boolean(fieldErrors.neighborhood)} aria-describedby={fieldErrors.neighborhood ? "error-neighborhood" : undefined} value={selectedNeighborhood} onChange={(event) => { setSelectedNeighborhood(event.target.value); clearError("neighborhood"); }} className="h-12 w-full rounded-md border border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4 text-base outline-none md:text-sm"><option value="">Neighborhood</option>{neighborhoods.map((neighborhood) => <option key={neighborhood} value={neighborhood}>{neighborhood}</option>)}</select><FieldError id="error-neighborhood" message={fieldErrors.neighborhood} /></div></div>
                   <Input placeholder="Apartment, floor, or gate code (optional)" className="mt-3 h-11 rounded-md border-(--bd-dbe3ef) bg-(--bg-ffffff) px-4" />
                 </fieldset>
 
-                <fieldset>
+                <fieldset id="field-slot" tabIndex={-1} className="outline-none">
                   <legend className="mb-1 text-lg font-bold tracking-[-0.025em]" style={{ color: ink }}>4. Pick an arrival time</legend>
                   <p className="mb-4 text-xs text-(--fg-8898aa)">All times KST · matched against live groomer routes</p>
-                  <div className="grid gap-5 sm:grid-cols-2">{Object.entries(groupedSlots).map(([dateKey, dateSlots]) => <div key={dateKey}><p className="mb-2 text-sm font-bold" style={{ color: ink }}>{dateSlots[0]?.dateLabel}</p><div className="grid grid-cols-2 gap-2">{dateSlots.map((slot) => <button type="button" key={slot.id} onClick={() => { setSelectedSlotId(slot.id); setFormError(""); }} className={cn("rounded-md border px-3 py-3 text-sm font-bold", selectedSlotId === slot.id ? "text-white" : "border-(--bd-dbe3ef) bg-(--bg-ffffff) text-(--fg-425466)")} style={selectedSlotId === slot.id ? { background: accent, borderColor: accent } : undefined}>{slot.timeLabel}</button>)}</div></div>)}{!slots.length && <p className="text-sm text-(--fg-53627a)">No routes are open for this address yet.</p>}</div>
+                  <div className="grid gap-5 sm:grid-cols-2">{Object.entries(groupedSlots).map(([dateKey, dateSlots]) => <div key={dateKey}><p className="mb-2 text-sm font-bold" style={{ color: ink }}>{dateSlots[0]?.dateLabel}</p><div className="grid grid-cols-2 gap-2">{dateSlots.map((slot) => <button type="button" key={slot.id} onClick={() => { setSelectedSlotId(slot.id); setFormError(""); clearError("slot"); }} className={cn("rounded-md border px-3 py-3 text-sm font-bold", selectedSlotId === slot.id ? "text-white" : "border-(--bd-dbe3ef) bg-(--bg-ffffff) text-(--fg-425466)")} style={selectedSlotId === slot.id ? { background: accent, borderColor: accent } : undefined}>{slot.timeLabel}</button>)}</div></div>)}{!slots.length && <p className="text-sm text-(--fg-53627a)">No routes are open for this address yet.</p>}</div><FieldError id="error-slot" message={fieldErrors.slot} />
                 </fieldset>
               </div>
 
