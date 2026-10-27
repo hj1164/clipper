@@ -2,7 +2,6 @@
 
 import {
   CalendarDays,
-  Check,
   Clock3,
   Dog,
   MapPin,
@@ -11,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { getStatusStyle } from "@/lib/clipper/status";
 import type { AppointmentDetails } from "@/lib/clipper/types";
 
 type AppointmentCardProps = {
@@ -42,25 +42,6 @@ type DetailsForDisplay = {
     description?: string | null;
     durationMinutes?: number | null;
   } | null;
-};
-
-const statusLabels: Record<string, { label: string; className: string }> = {
-  confirmed: {
-    label: "Confirmed",
-    className: "border-(--bd-bfe8db) bg-(--bg-e7f8f1) text-(--fg-08775d)",
-  },
-  completed: {
-    label: "Completed",
-    className: "border-(--bd-cbd8ff) bg-(--bg-eef1ff) text-(--fg-4353a3)",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "border-(--bd-f3c4c0) bg-(--bg-fff0ef) text-(--fg-9f3f38)",
-  },
-  pending: {
-    label: "Pending",
-    className: "border-(--bd-e4d5a3) bg-(--bg-fff8dc) text-(--fg-775d13)",
-  },
 };
 
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -108,10 +89,8 @@ function formatPrice(priceCents: number | null | undefined) {
 export function AppointmentCard({ appointment }: AppointmentCardProps) {
   const details = appointment as unknown as DetailsForDisplay;
   const service = details.package ?? details.groomingPackage;
-  const status = statusLabels[details.status ?? ""] ?? {
-    label: details.status ?? "Booked",
-    className: "border-(--bd-cbd8ff) bg-(--bg-eef1ff) text-(--fg-4353a3)",
-  };
+  const status = getStatusStyle(details.status);
+  const StatusIcon = status.icon;
   const appointmentDate = formatDate(details.startsAt);
   const startTime = formatTime(details.startsAt);
   const endTime = formatTime(details.endsAt);
@@ -130,7 +109,7 @@ export function AppointmentCard({ appointment }: AppointmentCardProps) {
             </h2>
           </div>
           <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${status.className}`}>
-            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+            <StatusIcon aria-hidden="true" className="size-3.5" strokeWidth={3} />
             {status.label}
           </span>
         </div>
